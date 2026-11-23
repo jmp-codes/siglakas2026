@@ -284,16 +284,18 @@ if(MODE==="admin"){try{const r=localStorage.getItem(KEY);if(r)results=JSON.parse
 function save(){try{localStorage.setItem(KEY,JSON.stringify(results))}catch(e){}}
 // ---------- online sync (Supabase) ----------
 const SBON=typeof SB_URL==="string"&&SB_URL.length>0;
-let pend=0,pulled=false;
+let pend=0,pulled=false,rev=0;
 const getPin=()=>{try{return sessionStorage.getItem("siglakas-pin")||""}catch(e){return""}};
-async function sbRpc(fn,args){const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});if(!r.ok)throw new Error("rpc "+r.status);return r.json()}
+async function sbRpc(fn,args){const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});if(!r.ok){const t=await r.text().catch(()=>"");throw new Error(t||("rpc "+r.status))}return r.json()}
 function setSync(ok){const el=document.getElementById("syncst");if(el){el.textContent=ok?"● Online sync: connected":"● Online sync: offline — changes are kept in this browser";el.style.color=ok?"#0a7a3c":"#b42318"}}
-async function sbPush(){if(!SBON)return;pend++;try{await sbRpc("siglakas_replace",{p:getPin(),data:results});setSync(true)}catch(e){setSync(false)}finally{pend--}}
-async function sbSet(eid,k,val){if(!SBON)return;pend++;try{await sbRpc("siglakas_set",{p:getPin(),eid:eid,k:k,val:val||""});setSync(true)}catch(e){setSync(false)}finally{pend--}}
-async function sbPull(){if(!SBON||MODE!=="admin"||!ST.auth||pend)return;
+function authFail(e){setSync(false);if(/bad pin/i.test(String(e&&e.message))){ST.auth=false;try{sessionStorage.removeItem("siglakas-auth");sessionStorage.removeItem("siglakas-pin")}catch(x){}render();const m=document.getElementById("pinMsg");if(m)m.textContent="Your sign-in expired. Please enter the PIN again — your last change was not saved online."}}
+async function sbPush(){if(!SBON)return;pend++;rev++;try{await sbRpc("siglakas_replace",{p:getPin(),data:results});setSync(true)}catch(e){authFail(e)}finally{pend--}}
+async function sbSet(eid,k,val){if(!SBON)return;pend++;rev++;try{await sbRpc("siglakas_set",{p:getPin(),eid:eid,k:k,val:val||""});setSync(true)}catch(e){authFail(e)}finally{pend--}}
+async function sbPull(){if(!SBON||MODE!=="admin"||!ST.auth||pend)return;const my=rev;
   try{const r=await fetch(SB_URL+"/rest/v1/siglakas_results?id=eq.1&select=results",{headers:{apikey:SB_KEY},cache:"no-store"});if(!r.ok)throw 0;const a=await r.json();const sv=a[0]&&a[0].results;if(!sv)throw 0;
-    if(!pulled&&!Object.keys(sv).length&&Object.keys(results).length){pulled=true;await sbPush();return}
+    if(pend||my!==rev)return;if(!pulled&&!Object.keys(sv).length&&Object.keys(results).length){pulled=true;await sbPush();return}
     pulled=true;setSync(true);
+    if(pend||my!==rev)return;
     if(JSON.stringify(sv)!==JSON.stringify(results)){results=sv;save();render()}}catch(e){setSync(false)}}
 const ST={page:MODE==="admin"?"admin":"standings",auth:false,cat:"all",sub:"standings",day:"all",ecat:"all",sport:"all",q:"",pg:1,per:6,mode:"list",open:{},sday:1,spg:1,sper:10,sq:"",edit:false};
 const $=s=>document.querySelector(s);
@@ -625,6 +627,7 @@ setupHeader();
 (async()=>{
   if(MODE==="public"){const ok=await loadPublished();if(!ok){try{const r=localStorage.getItem(KEY);if(r)results=JSON.parse(r)||{}}catch(e){}}}
   else{ST.auth=(function(){try{return sessionStorage.getItem("siglakas-auth")==="1"}catch(e){return false}})();
+    if(SBON&&ST.auth&&!getPin())ST.auth=false;
     if(!Object.keys(results).length)await loadPublished();}
   render();
   if(MODE==="admin"&&SBON){setSync(false);document.getElementById("syncst")&&(document.getElementById("syncst").textContent="● Online sync: sign in to connect");setInterval(sbPull,5000);if(ST.auth)sbPull()}
