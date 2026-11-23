@@ -219,6 +219,7 @@ const GEM=(c,w=38,h=34)=>`<svg viewBox="0 0 40 36" width="${w}" height="${h}"><p
 document.getElementById("banners").innerHTML=PROGRAMS.map(p=>`<div class="pennant-wrap"><img src="${IMG["ban-"+p.id.toLowerCase()]}" alt="${p.id} ${p.nick}"></div>`).join("");
 
 const MODE="admin";const RESULTS_URL="results.json";const PUBLIC_URL="index.html";
+const SB_URL="https://ltawiawybwvbqspmlksl.supabase.co";const SB_KEY="sb_publishable__2KAD1znhk5UZ39GnLzN6Q_5J2iztgn";
 // ===== Change this PIN before uploading =====
 const PIN="siglakas2026";
 const WEIGHT={team:3,indiv:1};
@@ -281,6 +282,19 @@ const KEY="siglakas2026-results";
 let results={};
 if(MODE==="admin"){try{const r=localStorage.getItem(KEY);if(r)results=JSON.parse(r)||{}}catch(e){}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(results))}catch(e){}}
+// ---------- online sync (Supabase) ----------
+const SBON=typeof SB_URL==="string"&&SB_URL.length>0;
+let pend=0,pulled=false;
+const getPin=()=>{try{return sessionStorage.getItem("siglakas-pin")||""}catch(e){return""}};
+async function sbRpc(fn,args){const r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});if(!r.ok)throw new Error("rpc "+r.status);return r.json()}
+function setSync(ok){const el=document.getElementById("syncst");if(el){el.textContent=ok?"● Online sync: connected":"● Online sync: offline — changes are kept in this browser";el.style.color=ok?"#0a7a3c":"#b42318"}}
+async function sbPush(){if(!SBON)return;pend++;try{await sbRpc("siglakas_replace",{p:getPin(),data:results});setSync(true)}catch(e){setSync(false)}finally{pend--}}
+async function sbSet(eid,k,val){if(!SBON)return;pend++;try{await sbRpc("siglakas_set",{p:getPin(),eid:eid,k:k,val:val||""});setSync(true)}catch(e){setSync(false)}finally{pend--}}
+async function sbPull(){if(!SBON||MODE!=="admin"||!ST.auth||pend)return;
+  try{const r=await fetch(SB_URL+"/rest/v1/siglakas_results?id=eq.1&select=results",{headers:{apikey:SB_KEY},cache:"no-store"});if(!r.ok)throw 0;const a=await r.json();const sv=a[0]&&a[0].results;if(!sv)throw 0;
+    if(!pulled&&!Object.keys(sv).length&&Object.keys(results).length){pulled=true;await sbPush();return}
+    pulled=true;setSync(true);
+    if(JSON.stringify(sv)!==JSON.stringify(results)){results=sv;save();render()}}catch(e){setSync(false)}}
 const ST={page:MODE==="admin"?"admin":"standings",auth:false,cat:"all",sub:"standings",day:"all",ecat:"all",sport:"all",q:"",pg:1,per:6,mode:"list",open:{},sday:1,spg:1,sper:10,sq:"",edit:false};
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/"/g,"&quot;");
@@ -435,8 +449,8 @@ function pageAdmin(){
   const list=filteredEvents().map(e=>{const r=results[e.id]||{};
     return `<div class="ev3"><div><b>${e.name}</b><br><small>${e.day} · ${CATNAME[e.cat]} · counts ×${WEIGHT[e.cat]}</small></div>
     ${["g","s","b"].map(k=>`<div><span class="dot ${k}"></span><select data-e="${e.id}" data-k="${k}">${opts(r[k],["g","s","b"].filter(x=>x!==k).map(x=>r[x]).filter(Boolean))}</select></div>`).join("")}</div>`}).join("")||'<p class="note">No events match.</p>';
-  return dayTabs()+panel(`${catSubs()}${heading(I.gear.replace("<svg","<svg stroke='#6a1fb4'"),"Tabulator",false)}<div class="editbanner">✏️ Changes save automatically in this browser. To update the public page, press <b>Download public index.html</b> and upload it over the old <b>index.html</b>. A program can hold only one place per event.</div>${status("all")}${eventFilters(false)}${list}
-  <div class="filters" style="margin-top:14px"><button class="btn" id="pubDl">Download public index.html</button><button class="btn alt" id="pubPv">Preview public page</button><button class="btn alt" id="exp2">Back up results</button><button class="btn alt" id="imp">Import results</button><button class="btn alt" id="clr">Clear all</button><button class="btn alt" id="signout">Sign out</button></div>
+  return dayTabs()+panel(`${catSubs()}${heading(I.gear.replace("<svg","<svg stroke='#6a1fb4'"),"Tabulator",false)}<div class="editbanner">✏️ Changes save automatically and go <b>live</b> on the public page within a few seconds. <span id="syncst" style="font-weight:800"></span> A program can hold only one place per event.</div>${status("all")}${eventFilters(false)}${list}
+  <div class="filters" style="margin-top:14px"><button class="btn" id="pubJs">Download results.json</button><button class="btn alt" id="pubDl">Download public index.html</button><button class="btn alt" id="pubPv">Preview public page</button><button class="btn alt" id="exp2">Back up results</button><button class="btn alt" id="imp">Import results</button><button class="btn alt" id="clr">Clear all</button><button class="btn alt" id="signout">Sign out</button></div>
   <textarea id="io" rows="4" style="width:100%;display:none" placeholder="Paste results here, then press Import again"></textarea><p class="note" id="iomsg"></p>`);
 }
 
@@ -468,6 +482,33 @@ function medalSVG(k){
 }
 function branchSVG(flip){let l="";for(let k=0;k<7;k++){const x=10+k*13,y=34-Math.sin(k/6*Math.PI)*16+k*1.2;l+=`<ellipse cx="${x}" cy="${y-5}" rx="9" ry="3.6" transform="rotate(-35 ${x} ${y-5})" fill="#f1c24a"/><ellipse cx="${x}" cy="${y+5}" rx="9" ry="3.6" transform="rotate(35 ${x} ${y+5})" fill="#d99a14"/>`}
   return `<svg viewBox="0 0 110 60" width="64" height="38" style="${flip?"transform:scaleX(-1)":""}"><path d="M4 40 Q50 8 106 30" stroke="#e5b230" stroke-width="2.2" fill="none"/>${l}</svg>`}
+function cardHTML(r,i,seal){return `<article class="team ${r.id.toLowerCase()}" data-id="${r.id}" style="--i:${i}"><div class="rankb">${rankSVG(r.rank)}</div><div class="teamhead"><img class="seal" src="${seal}" alt="${r.id} seal"><div><div class="teamname">${r.id}</div><div class="teamfull">${FULLNAME[r.id]}</div></div></div><div class="medals">${[["g","GOLD",r.g],["s","SILVER",r.s],["b","BRONZE",r.b]].map((m,j)=>`<div class="medal" style="--j:${j}"><span class="mi">${medalSVG(m[0])}</span><strong data-v="${m[2]}">${m[2]}</strong><small>${m[1]}</small></div>`).join("")}</div><div class="total">TOTAL <span data-v="${r.g+r.s+r.b}">${r.g+r.s+r.b}</span></div></article>`}
+function liveMain(cfg){
+  var $=function(s){return document.querySelector(s)};
+  var seals={};Array.prototype.forEach.call(document.querySelectorAll(".team"),function(t){seals[t.getAttribute("data-id")]=t.querySelector(".seal").src});
+  function calc(res){var t={};cfg.PR.forEach(function(p){t[p]={id:p,g:0,s:0,b:0,pts:0}});
+    Object.keys(cfg.EV).forEach(function(eid){var r=res[eid];if(!r)return;var w=cfg.W[cfg.EV[eid]];["g","s","b"].forEach(function(k){if(r[k]&&t[r[k]]){t[r[k]][k]+=w;t[r[k]].pts+=w}})});
+    var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
+    var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
+  var last="",prev={};
+  function apply(res,label){
+    var rows=calc(res),sig=JSON.stringify(rows.map(function(r){return[r.id,r.g,r.s,r.b,r.rank]}));
+    if(sig===last)return;var first=last==="";last=sig;
+    document.body.classList.add("live");
+    $(".cards").innerHTML=rows.map(function(r,i){return cardHTML(r,i,seals[r.id])}).join("");
+    if(!first)Array.prototype.forEach.call(document.querySelectorAll(".team"),function(t){var id=t.getAttribute("data-id"),p=prev[id];if(!p)return;
+      Array.prototype.forEach.call(t.querySelectorAll(".medal"),function(m,j){if(p[j]!==+m.querySelector("strong").textContent)m.classList.add("chg")})});
+    prev={};rows.forEach(function(r){prev[r.id]=[r.g,r.s,r.b]});
+    var d=new Date();$("#meta").textContent="Live results · Updated "+d.toLocaleTimeString("en-PH",{hour:"numeric",minute:"2-digit",second:"2-digit"});
+  }
+  function readLocal(){try{var r=localStorage.getItem(cfg.KEY);if(r){var o=JSON.parse(r);return(o&&o.results)?o.results:o}}catch(e){}return null}
+  function tick(){
+    if(cfg.SB){try{fetch(cfg.SB+"/rest/v1/siglakas_results?id=eq.1&select=results",{headers:{apikey:cfg.SBK},cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(a){if(a&&a[0]&&a[0].results&&typeof a[0].results==="object")apply(a[0].results);else fallback()}).catch(fallback)}catch(e){fallback()}return}
+    fallback()}
+  function fallback(){var l=readLocal();if(l&&typeof l==="object"){apply(l);return}
+    try{fetch(cfg.URL+"?v="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(o){if(o&&typeof o==="object")apply(o.results||o)}).catch(function(){})}catch(e){}}
+  window.addEventListener("storage",tick);setInterval(tick,3000);tick();
+}
 function staticHTML(rows,asOf){
   const css=`*{box-sizing:border-box}html{font-size:min(calc(100vw / 104.5),calc(100vh / 58.8))}html,body{margin:0;height:100%;font-family:Inter,'Segoe UI',Arial,sans-serif;color:#fff}body{background:radial-gradient(ellipse at 50% 8%,#3a44c4 0%,#1d1a78 40%,#0a0838 100%);overflow:hidden;position:fixed;inset:0;width:100%}html{overflow:hidden}
 .stage{position:absolute;left:50%;top:50%;width:104.5rem;height:58.8rem;transform:translate(-50%,-50%);isolation:isolate;padding:1.5rem 3rem 0;display:flex;flex-direction:column}
@@ -502,15 +543,17 @@ h1{margin:0;font-style:italic;text-align:center;font-size:6.2rem;font-weight:900
 .footer{margin-top:auto;margin-bottom:3.6rem;display:flex;align-items:center;justify-content:center;gap:.9rem;text-align:center;color:#dfe4ff;font-size:.95rem;letter-spacing:.14em;animation:fadein 1s 1.8s ease both}.footer:before,.footer:after{content:"";height:2px;width:12rem;background:linear-gradient(90deg,transparent,#f4c545)}.footer:after{transform:scaleX(-1)}
 @keyframes rise{from{opacity:0;transform:translateY(46px) scale(.95)}to{opacity:1;transform:none}}@keyframes drop{0%{transform:translate(-50%,-70px);opacity:0}65%{transform:translate(-50%,7px);opacity:1}100%{transform:translate(-50%,0);opacity:1}}@keyframes pop{0%{transform:scale(.55);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1);opacity:1}}@keyframes fadein{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}@keyframes flicker{0%,100%{transform:rotate(-2deg) scale(1);filter:drop-shadow(0 0 14px #ffae32)}20%{transform:rotate(1deg) scale(1.04);filter:drop-shadow(0 0 26px #ff8a00)}45%{transform:rotate(-1deg) scale(.98);filter:drop-shadow(0 0 12px #ffae32)}70%{transform:rotate(2deg) scale(1.05);filter:drop-shadow(0 0 28px #ff7a00)}}@keyframes shine{0%{background-position:-150% 0,0 0}60%,100%{background-position:250% 0,0 0}}@keyframes goldglow{0%,100%{box-shadow:0 0 1.7rem var(--glow),0 1rem 2rem #0007,inset 0 2px 0 #ffffff44}50%{box-shadow:0 0 3.6rem #ffd46bdd,0 1rem 2rem #0007,inset 0 2px 0 #ffffff44}}@keyframes floatup{0%{transform:translateY(0);opacity:0}12%{opacity:.9}100%{transform:translateY(-62rem) translateX(34px);opacity:0}}
 .team:first-child{animation:rise .95s cubic-bezier(.2,.8,.2,1) .6s both,goldglow 3s 2.2s ease-in-out infinite}
-.sparks{position:absolute;inset:0;overflow:hidden;z-index:-1;pointer-events:none}.sparks i{position:absolute;bottom:-10px;border-radius:50%;background:#ffe27c;box-shadow:0 0 9px #ffd46b;opacity:0;animation:floatup linear infinite}
+.live .team,.live .medal,.live .rankb,.live .seal,.live .total{animation:none}.live .team:first-child{animation:goldglow 3s ease-in-out infinite}.live .medal.chg{animation:pop .7s both}.sparks{position:absolute;inset:0;overflow:hidden;z-index:-1;pointer-events:none}.sparks i{position:absolute;bottom:-10px;border-radius:50%;background:#ffe27c;box-shadow:0 0 9px #ffd46b;opacity:0;animation:floatup linear infinite}
 @media(max-aspect-ratio:1/1){html{font-size:16px}.team{padding:4rem .8rem 3.4rem}.teamhead{min-height:0;gap:.7rem}.seal{height:4.2rem;width:4.2rem}.teamname{font-size:2.6rem}.teamfull{font-size:.8rem;white-space:normal}.medals{gap:.4rem}.medal strong{font-size:3rem}.medal small{font-size:.75rem}.medal .mi{width:2.8rem;height:3.3rem;top:-1.3rem}.medal{padding-top:2rem}.total{font-size:1rem}.mast{gap:.3rem}.torch{display:none}html,body{height:auto;min-height:100%}html{overflow:auto}body{position:static;overflow-x:hidden;overflow-y:auto;width:auto}.stage{position:relative;left:auto;top:auto;transform:none;width:100%;height:auto;min-height:100vh;padding:1rem 1rem 6rem;overflow:hidden}.cards{grid-template-columns:1fr;gap:4.4rem}.sil,.wave{display:none}.omsu{position:static;display:block;margin:0 auto .6rem;height:5.5rem;width:5.5rem}.topline{font-size:.7rem}.topline:before,.topline:after{width:1.5rem}h1{font-size:2.9rem}.torch{height:4.6rem}.badge{font-size:1.1rem;padding:.4rem 1.4rem}.badgewrap svg{display:none}.meta{font-size:.85rem;margin-bottom:3.8rem}.footer{margin-top:3rem;font-size:.7rem}.footer:before,.footer:after{width:1.5rem}.bottomrib,.gemL,.gemR{display:none}.sparks i{animation-name:floatup}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}.sparks{display:none}}`;
-  const card=(r,i)=>`<article class="team ${r.id.toLowerCase()}" style="--i:${i}"><div class="rankb">${rankSVG(r.rank)}</div><div class="teamhead"><img class="seal" src="${SEAL[r.id]}" alt="${r.id} seal"><div><div class="teamname">${r.id}</div><div class="teamfull">${FULLNAME[r.id]}</div></div></div><div class="medals">${[["g","GOLD",r.g],["s","SILVER",r.s],["b","BRONZE",r.b]].map((m,j)=>`<div class="medal" style="--j:${j}"><span class="mi">${medalSVG(m[0])}</span><strong data-v="${m[2]}">${m[2]}</strong><small>${m[1]}</small></div>`).join("")}</div><div class="total">TOTAL <span data-v="${r.g+r.s+r.b}">${r.g+r.s+r.b}</span></div></article>`;
+  const card=(r,i)=>cardHTML(r,i,SEAL[r.id]);
+  const cfg={KEY:KEY,URL:RESULTS_URL,SB:(typeof SB_URL==="string"?SB_URL:""),SBK:(typeof SB_KEY==="string"?SB_KEY:""),PR:PROGRAMS.map(p=>p.id),W:WEIGHT,EV:Object.fromEntries(E.map(e=>[e.id,e.cat]))};
+  const liveJs="<script>"+laurelArc+";"+rankSVG+";"+medalSVG+";var FULLNAME="+JSON.stringify(FULLNAME)+";"+cardHTML+";"+liveMain+";liveMain("+JSON.stringify(cfg)+");<\/script>";
   const script='<script>(function(){if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;var els=document.querySelectorAll("[data-v]");els.forEach(function(e,k){var v=+e.getAttribute("data-v"),card=Math.floor(k/4);e.textContent="0";var delay=1300+card*200+(k%4)*120;setTimeout(function(){var t0=performance.now();(function f(t){var p=Math.min(1,(t-t0)/1300),ease=1-Math.pow(1-p,3);e.textContent=Math.round(v*ease);if(p<1)requestAnimationFrame(f)})(t0)},delay)});var sp=document.createElement("div");sp.className="sparks";for(var i=0;i<24;i++){var s=document.createElement("i");s.style.left=(Math.random()*100)+"%";s.style.animationDelay=(Math.random()*9)+"s";s.style.animationDuration=(7+Math.random()*8)+"s";var z=(2+Math.random()*4)+"px";s.style.width=z;s.style.height=z;sp.appendChild(s)}document.querySelector(".stage").appendChild(sp)})();<\/script>';
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SIGLAKAS 2026 | Medal Tally</title><link rel="icon" type="image/png" href="${FAVICON}">
 <style>${css}</style></head><body><div class="bottomrib"></div><img class="gemL" src="${IMG["gem-purple"]}" alt=""><img class="gemR" src="${IMG["gem-red"]}" alt=""><main class="stage"><div class="wave l"></div><div class="wave r"></div><img class="sil a" src="${IMG["sil-bball"]}" alt=""><img class="sil b" src="${IMG["sil-run"]}" alt=""><img class="sil c" src="${IMG["sil-vball"]}" alt=""><img class="sil d" src="${IMG["sil-run"]}" alt="">
-<img class="omsu" src="${IMG["seal-omsu"]}" alt="Occidental Mindoro State University seal"><div class="shell"><div class="topline">OCCIDENTAL MINDORO STATE UNIVERSITY · LUBANG CAMPUS</div><div class="mast"><img class="torch" src="${IMG.torchrings}" alt=""><h1>SIGLAKAS 2026</h1></div><div class="badgewrap">${branchSVG(false)}<div class="badge">OFFICIAL MEDAL TALLY DISPLAY</div>${branchSVG(true)}</div><div class="meta">As of ${asOf} · Static snapshot · Not automatically updated</div><section class="cards" aria-label="Department medal counts">${rows.map(card).join("")}</section><div class="footer">SIGLAKAS 2026 · OMSU LUBANG CAMPUS · PUBLIC VIEWING DISPLAY</div></div></main>${script}</body></html>
+<img class="omsu" src="${IMG["seal-omsu"]}" alt="Occidental Mindoro State University seal"><div class="shell"><div class="topline">OCCIDENTAL MINDORO STATE UNIVERSITY · LUBANG CAMPUS</div><div class="mast"><img class="torch" src="${IMG.torchrings}" alt=""><h1>SIGLAKAS 2026</h1></div><div class="badgewrap">${branchSVG(false)}<div class="badge">OFFICIAL MEDAL TALLY DISPLAY</div>${branchSVG(true)}</div><div class="meta" id="meta">As of ${asOf} · Snapshot · updates live when connected to the tabulator</div><section class="cards" aria-label="Department medal counts">${rows.map(card).join("")}</section><div class="footer">SIGLAKAS 2026 · OMSU LUBANG CAMPUS · PUBLIC VIEWING DISPLAY</div></div></main>${script}${liveJs}</body></html>
 `;
 }
 function publicRows(){return tally("all").map(x=>({id:x.id,g:x.g,s:x.s,b:x.b,rank:x.rank}))}
@@ -559,19 +602,23 @@ function wire(){
     else if(a==="csv-standings")exportStandings();else if(a==="csv-results")exportResults();
     else if(a==="csv-sched"){const d=SCHEDULE[ST.sday];download("siglakas2026-schedule.csv",csv([["Day","Time","Activity","Venue"],...d[1].map(r=>[d[0],r[0],r[1].replace(/&amp;/g,"&"),r[4].replace(/&amp;/g,"&")])]))}
   });
-  const pinGo=()=>{const v=($("#pin")||{}).value;if(v===PIN){ST.auth=true;try{sessionStorage.setItem("siglakas-auth","1")}catch(e){}render()}else $("#pinMsg").textContent="Incorrect PIN."};
+  const pinGo=async()=>{const v=($("#pin")||{}).value||"";let ok=false;
+    if(SBON){$("#pinMsg").textContent="Checking…";try{ok=await sbRpc("siglakas_check",{p:v})}catch(e){$("#pinMsg").textContent="Can't reach the online database. Check your internet connection.";return}}
+    else ok=(v===PIN);
+    if(ok){ST.auth=true;try{sessionStorage.setItem("siglakas-auth","1");sessionStorage.setItem("siglakas-pin",v)}catch(e){}render();sbPull()}else $("#pinMsg").textContent="Incorrect PIN."};
   on("#pinGo",pinGo);const pn=$("#pin");if(pn)pn.onkeydown=e=>{if(e.key==="Enter")pinGo()};
-  on("#signout",()=>{ST.auth=false;try{sessionStorage.removeItem("siglakas-auth")}catch(e){}render()});
+  on("#signout",()=>{ST.auth=false;try{sessionStorage.removeItem("siglakas-auth");sessionStorage.removeItem("siglakas-pin")}catch(e){}render()});
   on("#pubDl",()=>{const txt=staticHTML(publicRows(),nowStr());download("index.html",txt,"text/html");$("#iomsg").textContent="Downloaded index.html. If nothing downloaded, your browser blocked it — try again from the uploaded site."});
   on("#pubPv",previewPublic);
-  document.querySelectorAll("select[data-e]").forEach(s=>s.onchange=()=>{const id=s.dataset.e;results[id]=results[id]||{};results[id][s.dataset.k]=s.value||undefined;save();render()});
+  on("#pubJs",()=>{download("results.json",JSON.stringify({updated:nowStr(),results}),"application/json");$("#iomsg").textContent="Downloaded results.json. Upload it next to index.html to update the public page."});
+  document.querySelectorAll("select[data-e]").forEach(s=>s.onchange=()=>{const id=s.dataset.e;results[id]=results[id]||{};results[id][s.dataset.k]=s.value||undefined;save();sbSet(id,s.dataset.k,s.value);render()});
   on("#exp2",()=>{const io=$("#io");io.style.display="block";io.value=JSON.stringify(results);io.select();
     try{navigator.clipboard.writeText(io.value).then(()=>{$("#iomsg").textContent="Copied to clipboard."},()=>{})}catch(e){}
     $("#iomsg").textContent="Results shown above — copy and keep them."});
   on("#imp",()=>{const io=$("#io");
     if(io.style.display==="none"||!io.value.trim()){io.style.display="block";io.value="";io.focus();$("#iomsg").textContent="Paste results, then press Import again.";return}
-    try{const o=JSON.parse(io.value);if(!o||typeof o!=="object")throw 0;results=o.results&&typeof o.results==="object"?o.results:o;save();render()}catch(e){$("#iomsg").textContent="That isn't valid exported data."}});
-  const clr=$("#clr");if(clr)clr.onclick=()=>{if(clr.dataset.sure){results={};save();render()}else{clr.dataset.sure=1;clr.textContent="Click again to confirm"}};
+    try{const o=JSON.parse(io.value);if(!o||typeof o!=="object")throw 0;results=o.results&&typeof o.results==="object"?o.results:o;save();sbPush();render()}catch(e){$("#iomsg").textContent="That isn't valid exported data."}});
+  const clr=$("#clr");if(clr)clr.onclick=()=>{if(clr.dataset.sure){results={};save();sbPush();render()}else{clr.dataset.sure=1;clr.textContent="Click again to confirm"}};
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-go]");if(b){ST.page=b.dataset.go;render();window.scrollTo({top:0,behavior:"smooth"})}});
 setupHeader();
@@ -580,6 +627,7 @@ setupHeader();
   else{ST.auth=(function(){try{return sessionStorage.getItem("siglakas-auth")==="1"}catch(e){return false}})();
     if(!Object.keys(results).length)await loadPublished();}
   render();
+  if(MODE==="admin"&&SBON){setSync(false);document.getElementById("syncst")&&(document.getElementById("syncst").textContent="● Online sync: sign in to connect");setInterval(sbPull,5000);if(ST.auth)sbPull()}
 })();
 </script>
 </body>
