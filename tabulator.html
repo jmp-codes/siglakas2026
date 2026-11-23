@@ -225,7 +225,10 @@ const PIN="siglakas2026";
 const WEIGHT={team:3,indiv:1};
 const CATNAME={team:"Group Sport",indiv:"Individual"};
 const E=[];
-function add(day,sport,name,cat){E.push({id:"e"+(E.length+1),day,sport,name,cat})}
+// Medal value per event: individual = 1, 2-4 participants = 3, 5 or more participants = 5
+const BIG=["Cheer Dance","Volleyball","Mobile Legends"];
+function wt(sport,name,cat){if(cat==="indiv")return 1;if(BIG.includes(sport)||/5x5/.test(name))return 5;return 3}
+function add(day,sport,name,cat){E.push({id:"e"+(E.length+1),day,sport,name,cat,w:wt(sport,name,cat)})}
 add("Nov 25","Cheer Dance","Cheer Dance Competition (Color Guard)","team");
 add("Nov 25","Basketball","Basketball – Men (5x5)","team");
 add("Nov 25","Basketball","Basketball – Women (3x3)","team");
@@ -320,7 +323,7 @@ const NAV=MODE==="admin"
 function tally(cat){
   const t={};PROGRAMS.forEach(p=>t[p.id]={id:p.id,g:0,s:0,b:0,pts:0});
   E.filter(e=>cat==="all"||e.cat===cat).forEach(ev=>{const r=results[ev.id];if(!r)return;
-    ["g","s","b"].forEach(k=>{if(r[k]&&t[r[k]]){t[r[k]][k]+=WEIGHT[ev.cat];t[r[k]].pts+=WEIGHT[ev.cat]}})});
+    ["g","s","b"].forEach(k=>{if(r[k]&&t[r[k]]){t[r[k]][k]+=ev.w;t[r[k]].pts+=ev.w}})});
   const a=Object.values(t).sort((x,y)=>y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||PROGRAMS.findIndex(p=>p.id===x.id)-PROGRAMS.findIndex(p=>p.id===y.id));
   let rank=0;a.forEach((x,i)=>{const p=a[i-1];x.total=x.g+x.s+x.b;
     if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});
@@ -347,7 +350,7 @@ function status(cat){
 }
 function ruleBoxes(){
   return `<div class="rules-panel"><div class="rules-grid">
-   <div><div class="ic">i</div><div><h4>Medal Counting Rule</h4><p>Medals are counted by value: a group-sport medal counts as 3 (a gold in Sepak Takraw adds 3 golds) and an individual medal counts as 1. Total is the sum of gold, silver and bronze.</p></div></div>
+   <div><div class="ic">i</div><div><h4>Medal Counting Rule</h4><p>Medals are counted by value: an individual-sport medal counts as 1, a team of 2 to 4 participants counts as 3 (a gold in Sepak Takraw adds 3 golds), and a team of 5 or more participants counts as 5. Total is the sum of gold, silver and bronze.</p></div></div>
    <div><div class="ic">▤</div><div><h4>Tie-Breaking Rule</h4><p>Programs are ranked by total. Ties are broken by the higher gold count, then silver, then bronze.</p></div></div></div></div>`;
 }
 function pager(total,page,per,key,perOpts,label){
@@ -413,7 +416,7 @@ function pageResults(){
   else body=`<div class="results-wrapper"><table class="results-table wide"><thead><tr><th>#</th><th class="l">Event / Sport</th><th>Date</th><th>Category</th><th><span class="dot g"></span>Gold</th><th><span class="dot s"></span>Silver</th><th><span class="dot b"></span>Bronze</th><th></th></tr></thead><tbody>
   ${sl.map(e=>{const r=results[e.id]||{},n=E.indexOf(e)+1,o=ST.open[e.id];
    return `<tr><td><span class="num">${n}</span></td><td class="l evn"><b>${e.name}</b><small>${e.cat==="team"?"👥":"🏃"} ${CATNAME[e.cat]}</small></td><td>📅 ${e.day}</td><td><span class="chip">${e.sport}</span></td><td>${pill(r.g)}</td><td>${pill(r.s)}</td><td>${pill(r.b)}</td><td><button class="exp" data-x="${e.id}">${o?"⌃":"⌄"}</button></td></tr>
-   ${o?`<tr class="xrow"><td></td><td colspan="7">Each medal here counts as <b>${WEIGHT[e.cat]}</b> (${CATNAME[e.cat]}). ${isDone(e)?"Final results posted.":"Results pending."}</td></tr>`:""}`}).join("")}
+   ${o?`<tr class="xrow"><td></td><td colspan="7">Each medal here counts as <b>${e.w}</b> (${CATNAME[e.cat]}). ${isDone(e)?"Final results posted.":"Results pending."}</td></tr>`:""}`}).join("")}
   </tbody></table></div>`;
   return dayTabs()+panel(`${catSubs()}${heading(I.trophy.replace("<svg","<svg stroke='#6a1fb4'"),"Event Results",true,"results")}${status("all")}${eventFilters(true)}${body}${pager(all.length,ST.pg,ST.per,"p",null,"events")}`);
 }
@@ -440,7 +443,7 @@ function pageRules(){
   <div class="criteria-panel"><h3>📋 Event and Competition Rules</h3><div class="criteria-grid" style="grid-template-columns:repeat(2,1fr)">
   <ul><li>Participating programs: BSIT, BSBA, BEEd.</li><li>Players may take part in a maximum of three (3) events.</li><li>Round-robin for ball games, individual and dual sports; single elimination for athletics.</li></ul>
   <ul><li>Championship games for volleyball, beach volleyball, badminton, table tennis, sepak takraw, MLBB and pickleball are best-of-5 sets between rank 1 and 2.</li><li>Protests are resolved by the Jury of Appeals.</li></ul></div></div>
-  <p class="note">Team, doubles, relay and dance-sport couples count as group sports. Cheer Dance, Sports Fest King &amp; Queen and the Best Uniform award are scored separately; King &amp; Queen and Best Uniform are not included in the medal tally.</p>`);
+  <p class="note">Individual sports count 1; doubles, mixed doubles, relay, dance-sport couples, 3x3 Basketball and Sepak Takraw (2 to 4 participants) count 3; Volleyball, 5x5 Basketball, Cheer Dance and MLBB (5 or more) count 5. Cheer Dance, Sports Fest King &amp; Queen and the Best Uniform award are scored separately; King &amp; Queen and Best Uniform are not included in the medal tally.</p>`);
 }
 
 function pageAdmin(){
@@ -449,7 +452,7 @@ function pageAdmin(){
    <div class="filters"><input type="text" id="pin" placeholder="PIN" autocomplete="off" style="-webkit-text-security:disc;max-width:220px"><button class="btn" id="pinGo">Sign in</button></div><p class="note" id="pinMsg"></p>`);
   const opts=(sel,others)=>`<option value="">—</option>`+PROGRAMS.map(p=>`<option value="${p.id}" ${p.id===sel?"selected":""} ${others.includes(p.id)&&p.id!==sel?"disabled":""}>${p.id}</option>`).join("");
   const list=filteredEvents().map(e=>{const r=results[e.id]||{};
-    return `<div class="ev3"><div><b>${e.name}</b><br><small>${e.day} · ${CATNAME[e.cat]} · counts ×${WEIGHT[e.cat]}</small></div>
+    return `<div class="ev3"><div><b>${e.name}</b><br><small>${e.day} · ${CATNAME[e.cat]} · counts ×${e.w}</small></div>
     ${["g","s","b"].map(k=>`<div><span class="dot ${k}"></span><select data-e="${e.id}" data-k="${k}">${opts(r[k],["g","s","b"].filter(x=>x!==k).map(x=>r[x]).filter(Boolean))}</select></div>`).join("")}</div>`}).join("")||'<p class="note">No events match.</p>';
   return dayTabs()+panel(`${catSubs()}${heading(I.gear.replace("<svg","<svg stroke='#6a1fb4'"),"Tabulator",false)}<div class="editbanner">✏️ Changes save automatically and go <b>live</b> on the public page within a few seconds. <span id="syncst" style="font-weight:800"></span> A program can hold only one place per event.</div>${status("all")}${eventFilters(false)}${list}
   <div class="filters" style="margin-top:14px"><button class="btn" id="pubJs">Download results.json</button><button class="btn alt" id="pubDl">Download public index.html</button><button class="btn alt" id="pubPv">Preview public page</button><button class="btn alt" id="exp2">Back up results</button><button class="btn alt" id="imp">Import results</button><button class="btn alt" id="clr">Clear all</button><button class="btn alt" id="signout">Sign out</button></div>
@@ -458,7 +461,7 @@ function pageAdmin(){
 
 function pageHelp(){
   return panel(`${heading(I.help.replace("<svg","<svg stroke='#6a1fb4'"),"Help",false)}<div class="faq">
-  <h4>How are medals counted?</h4><p>By value. A group-sport medal counts as 3 and an individual medal counts as 1, in its own colour: winning Sepak Takraw gives 3 golds. Programs are ranked by total; ties go to more golds, then silvers, then bronzes.</p>
+  <h4>How are medals counted?</h4><p>By value. An individual medal counts as 1, a team of 2 to 4 participants counts as 3, and a team of 5 or more counts as 5, in its own colour: winning Sepak Takraw gives 3 golds and winning Volleyball gives 5 golds. Programs are ranked by total; ties go to more golds, then silvers, then bronzes.</p>
   <h4>When do standings change?</h4><p>Only when the tabulators post a result. Events without results are not counted.</p>
   ${MODE==="admin"?"<h4>How do I update the public page?</h4><p>Record results here, press <b>Download public index.html</b>, then upload it to your host, replacing the old <b>index.html</b>. The public page is a static snapshot, so it only changes when you upload a new one.</p>":"<h4>When are results updated?</h4><p>The tabulators post results as events finish. Refresh the page to see the latest.</p>"}
   <h4>Which sports are not counted?</h4><p>Sports Fest King &amp; Queen and the Best SIGLAKAS Uniform award are judged separately.</p></div>`);
@@ -489,7 +492,7 @@ function liveMain(cfg){
   var $=function(s){return document.querySelector(s)};
   var seals={};Array.prototype.forEach.call(document.querySelectorAll(".team"),function(t){seals[t.getAttribute("data-id")]=t.querySelector(".seal").src});
   function calc(res){var t={};cfg.PR.forEach(function(p){t[p]={id:p,g:0,s:0,b:0,pts:0}});
-    Object.keys(cfg.EV).forEach(function(eid){var r=res[eid];if(!r)return;var w=cfg.W[cfg.EV[eid]];["g","s","b"].forEach(function(k){if(r[k]&&t[r[k]]){t[r[k]][k]+=w;t[r[k]].pts+=w}})});
+    Object.keys(cfg.EV).forEach(function(eid){var r=res[eid];if(!r)return;var w=cfg.EV[eid];["g","s","b"].forEach(function(k){if(r[k]&&t[r[k]]){t[r[k]][k]+=w;t[r[k]].pts+=w}})});
     var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
     var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
   var last="",prev={};
@@ -549,7 +552,7 @@ h1{margin:0;font-style:italic;text-align:center;font-size:6.2rem;font-weight:900
 @media(max-aspect-ratio:1/1){html{font-size:16px}.team{padding:4rem .8rem 3.4rem}.teamhead{min-height:0;gap:.7rem}.seal{height:4.2rem;width:4.2rem}.teamname{font-size:2.6rem}.teamfull{font-size:.8rem;white-space:normal}.medals{gap:.4rem}.medal strong{font-size:3rem}.medal small{font-size:.75rem}.medal .mi{width:2.8rem;height:3.3rem;top:-1.3rem}.medal{padding-top:2rem}.total{font-size:1rem}.mast{gap:.3rem}.torch{display:none}html,body{height:auto;min-height:100%}html{overflow:auto}body{position:static;overflow-x:hidden;overflow-y:auto;width:auto}.stage{position:relative;left:auto;top:auto;transform:none;width:100%;height:auto;min-height:100vh;padding:1rem 1rem 6rem;overflow:hidden}.cards{grid-template-columns:1fr;gap:4.4rem}.sil,.wave{display:none}.omsu{position:static;display:block;margin:0 auto .6rem;height:5.5rem;width:5.5rem}.topline{font-size:.7rem}.topline:before,.topline:after{width:1.5rem}h1{font-size:2.9rem}.torch{height:4.6rem}.badge{font-size:1.1rem;padding:.4rem 1.4rem}.badgewrap svg{display:none}.meta{font-size:.85rem;margin-bottom:3.8rem}.footer{margin-top:3rem;font-size:.7rem}.footer:before,.footer:after{width:1.5rem}.bottomrib,.gemL,.gemR{display:none}.sparks i{animation-name:floatup}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}.sparks{display:none}}`;
   const card=(r,i)=>cardHTML(r,i,SEAL[r.id]);
-  const cfg={KEY:KEY,URL:RESULTS_URL,SB:(typeof SB_URL==="string"?SB_URL:""),SBK:(typeof SB_KEY==="string"?SB_KEY:""),PR:PROGRAMS.map(p=>p.id),W:WEIGHT,EV:Object.fromEntries(E.map(e=>[e.id,e.cat]))};
+  const cfg={KEY:KEY,URL:RESULTS_URL,SB:(typeof SB_URL==="string"?SB_URL:""),SBK:(typeof SB_KEY==="string"?SB_KEY:""),PR:PROGRAMS.map(p=>p.id),W:WEIGHT,EV:Object.fromEntries(E.map(e=>[e.id,e.w]))};
   const liveJs="<script>"+laurelArc+";"+rankSVG+";"+medalSVG+";var FULLNAME="+JSON.stringify(FULLNAME)+";"+cardHTML+";"+liveMain+";liveMain("+JSON.stringify(cfg)+");<\/script>";
   const script='<script>(function(){if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;var els=document.querySelectorAll("[data-v]");els.forEach(function(e,k){var v=+e.getAttribute("data-v"),card=Math.floor(k/4);e.textContent="0";var delay=1300+card*200+(k%4)*120;setTimeout(function(){var t0=performance.now();(function f(t){var p=Math.min(1,(t-t0)/1300),ease=1-Math.pow(1-p,3);e.textContent=Math.round(v*ease);if(p<1)requestAnimationFrame(f)})(t0)},delay)});var sp=document.createElement("div");sp.className="sparks";for(var i=0;i<24;i++){var s=document.createElement("i");s.style.left=(Math.random()*100)+"%";s.style.animationDelay=(Math.random()*9)+"s";s.style.animationDuration=(7+Math.random()*8)+"s";var z=(2+Math.random()*4)+"px";s.style.width=z;s.style.height=z;sp.appendChild(s)}document.querySelector(".stage").appendChild(sp)})();<\/script>';
   return `<!doctype html>
