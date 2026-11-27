@@ -89,8 +89,8 @@ h1{margin:0;font-style:italic;text-align:center;font-size:6.2rem;font-weight:900
   var seals={};Array.prototype.forEach.call(document.querySelectorAll(".team"),function(t){seals[t.getAttribute("data-id")]=t.querySelector(".seal").src});
   function calc(res){var t={};cfg.PR.forEach(function(p){t[p]={id:p,g:0,s:0,b:0,pts:0}});
     Object.keys(cfg.EV).forEach(function(eid){var r=res[eid];if(!r)return;var w=cfg.EV[eid];["g","s","b"].forEach(function(k){if(r[k]&&t[r[k]]){t[r[k]][k]+=w;t[r[k]].pts+=w}})});
-    var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
-    var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
+    var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
+    var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
   var last="",prev={};
   function apply(res,label){
     var rows=calc(res),sig=JSON.stringify(rows.map(function(r){return[r.id,r.g,r.s,r.b,r.rank]}));
@@ -109,4 +109,4 @@ h1{margin:0;font-style:italic;text-align:center;font-size:6.2rem;font-weight:900
   function fallback(){var l=readLocal();if(l&&typeof l==="object"){apply(l);return}
     try{fetch(cfg.URL+"?v="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(o){if(o&&typeof o==="object")apply(o.results||o)}).catch(function(){})}catch(e){}}
   window.addEventListener("storage",tick);setInterval(tick,3000);tick();
-};liveMain({"KEY":"siglakas2026-results","URL":"results.json","SB":"https://ltawiawybwvbqspmlksl.supabase.co","SBK":"sb_publishable__2KAD1znhk5UZ39GnLzN6Q_5J2iztgn","PR":["BSBA","BSIT","BEEd"],"W":{"team":3,"indiv":1},"EV":{"e1":5,"e2":5,"e3":3,"e4":5,"e5":5,"e6":3,"e7":5,"e8":1,"e9":1,"e10":1,"e11":1,"e12":3,"e13":3,"e14":3,"e15":1,"e16":1,"e17":3,"e18":3,"e19":3,"e20":1,"e21":1,"e22":3,"e23":3,"e24":3,"e25":1,"e26":1,"e27":1,"e28":1,"e29":3,"e30":3,"e31":1,"e32":1,"e33":1,"e34":1,"e35":1,"e36":1,"e37":3,"e38":3,"e39":3,"e40":3,"e41":3,"e42":3,"e43":3,"e44":3}});</script></body></html>
+};liveMain({"KEY":"siglakas2026-results","URL":"results.json","SB":"https://ltawiawybwvbqspmlksl.supabase.co","SBK":"sb_publishable__2KAD1znhk5UZ39GnLzN6Q_5J2iztgn","PR":["BSBA","BSIT","BEEd"],"W":{"team":3,"indiv":1},"EV":{"e1":5,"e2":5,"e3":3,"e4":5,"e5":5,"e6":3,"e7":5,"e8":1,"e9":1,"e10":1,"e11":1,"e12":3,"e13":3,"e14":3,"e15":1,"e16":1,"e17":3,"e18":3,"e19":3,"e20":1,"e21":1,"e22":3,"e23":3,"e24":3,"e25":1,"e26":1,"e27":1,"e28":1,"e29":3,"e30":3,"e31":1,"e32":1,"e33":1,"e34":1,"e35":1,"e36":1,"e40":3,"e44":3}});</script></body></html>

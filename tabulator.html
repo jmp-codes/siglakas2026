@@ -228,7 +228,7 @@ const E=[];
 // Medal value per event: individual = 1, 2-4 participants = 3, 5 or more participants = 5
 const BIG=["Cheer Dance","Volleyball","Mobile Legends"];
 function wt(sport,name,cat){if(cat==="indiv")return 1;if(BIG.includes(sport)||/5x5/.test(name))return 5;return 3}
-function add(day,sport,name,cat){E.push({id:"e"+(E.length+1),day,sport,name,cat,w:wt(sport,name,cat)})}
+function add(day,sport,name,cat,id){E.push({id:id||"e"+(E.length+1),day,sport,name,cat,w:wt(sport,name,cat)})}
 add("Nov 25","Cheer Dance","Cheer Dance Competition (Color Guard)","team");
 add("Nov 25","Basketball","Basketball – Men (5x5)","team");
 add("Nov 25","Basketball","Basketball – Women (3x3)","team");
@@ -245,7 +245,8 @@ add("Nov 26","Mobile Legends","MLBB Tournament","team");
 [["100-meter dash","indiv"],["200-meter dash","indiv"],["4x100-meter relay","team"],["Long jump","indiv"],["High jump","indiv"],["Discus throw","indiv"]].forEach(([n,c])=>{
   ["Men","Women"].forEach(g=>add("Nov 21","Athletics",n+" – "+g,c));
 });
-["Waltz","Tango","Quickstep","W.T.Q (Grade C)","Rumba","Cha-cha-cha","Jive","S.C.J (Grade C)"].forEach(n=>add("Nov 26","Dance Sports","Dance Sports – "+n,"team"));
+add("Nov 26","Dance Sports","Dance Sports – W.T.Q","team","e40");
+add("Nov 26","Dance Sports","Dance Sports – S.C.J","team","e44");
 const DAYS=["Nov 21","Nov 25","Nov 26"];
 
 const SCHEDULE=[
@@ -324,9 +325,9 @@ function tally(cat){
   const t={};PROGRAMS.forEach(p=>t[p.id]={id:p.id,g:0,s:0,b:0,pts:0});
   E.filter(e=>cat==="all"||e.cat===cat).forEach(ev=>{const r=results[ev.id];if(!r)return;
     ["g","s","b"].forEach(k=>{if(r[k]&&t[r[k]]){t[r[k]][k]+=ev.w;t[r[k]].pts+=ev.w}})});
-  const a=Object.values(t).sort((x,y)=>y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||PROGRAMS.findIndex(p=>p.id===x.id)-PROGRAMS.findIndex(p=>p.id===y.id));
+  const a=Object.values(t).sort((x,y)=>y.g-x.g||y.s-x.s||y.b-x.b||PROGRAMS.findIndex(p=>p.id===x.id)-PROGRAMS.findIndex(p=>p.id===y.id));
   let rank=0;a.forEach((x,i)=>{const p=a[i-1];x.total=x.g+x.s+x.b;
-    if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});
+    if(!p||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});
   return a;
 }
 const isDone=e=>{const r=results[e.id];return !!(r&&r.g&&r.s&&r.b)};
@@ -351,7 +352,7 @@ function status(cat){
 function ruleBoxes(){
   return `<div class="rules-panel"><div class="rules-grid">
    <div><div class="ic">i</div><div><h4>Medal Counting Rule</h4><p>Medals are counted by value: an individual-sport medal counts as 1, a team of 2 to 4 participants counts as 3 (a gold in Sepak Takraw adds 3 golds), and a team of 5 or more participants counts as 5. Total is the sum of gold, silver and bronze.</p></div></div>
-   <div><div class="ic">▤</div><div><h4>Tie-Breaking Rule</h4><p>Programs are ranked by total. Ties are broken by the higher gold count, then silver, then bronze.</p></div></div></div></div>`;
+   <div><div class="ic">▤</div><div><h4>Tie-Breaking Rule</h4><p>Programs are ranked by the number of golds. Ties are broken by the higher silver count, then bronze.</p></div></div></div></div>`;
 }
 function pager(total,page,per,key,perOpts,label){
   const pages=Math.max(1,Math.ceil(total/per));if(page>pages)page=pages;
@@ -461,7 +462,7 @@ function pageAdmin(){
 
 function pageHelp(){
   return panel(`${heading(I.help.replace("<svg","<svg stroke='#6a1fb4'"),"Help",false)}<div class="faq">
-  <h4>How are medals counted?</h4><p>By value. An individual medal counts as 1, a team of 2 to 4 participants counts as 3, and a team of 5 or more counts as 5, in its own colour: winning Sepak Takraw gives 3 golds and winning Volleyball gives 5 golds. Programs are ranked by total; ties go to more golds, then silvers, then bronzes.</p>
+  <h4>How are medals counted?</h4><p>By value. An individual medal counts as 1, a team of 2 to 4 participants counts as 3, and a team of 5 or more counts as 5, in its own colour: winning Sepak Takraw gives 3 golds and winning Volleyball gives 5 golds. Programs are ranked by gold count; ties go to more silvers, then bronzes. Total is shown for information.</p>
   <h4>When do standings change?</h4><p>Only when the tabulators post a result. Events without results are not counted.</p>
   ${MODE==="admin"?"<h4>How do I update the public page?</h4><p>Record results here, press <b>Download public index.html</b>, then upload it to your host, replacing the old <b>index.html</b>. The public page is a static snapshot, so it only changes when you upload a new one.</p>":"<h4>When are results updated?</h4><p>The tabulators post results as events finish. Refresh the page to see the latest.</p>"}
   <h4>Which sports are not counted?</h4><p>Sports Fest King &amp; Queen and the Best SIGLAKAS Uniform award are judged separately.</p></div>`);
@@ -493,8 +494,8 @@ function liveMain(cfg){
   var seals={};Array.prototype.forEach.call(document.querySelectorAll(".team"),function(t){seals[t.getAttribute("data-id")]=t.querySelector(".seal").src});
   function calc(res){var t={};cfg.PR.forEach(function(p){t[p]={id:p,g:0,s:0,b:0,pts:0}});
     Object.keys(cfg.EV).forEach(function(eid){var r=res[eid];if(!r)return;var w=cfg.EV[eid];["g","s","b"].forEach(function(k){if(r[k]&&t[r[k]]){t[r[k]][k]+=w;t[r[k]].pts+=w}})});
-    var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.pts-x.pts||y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
-    var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.pts!==x.pts||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
+    var a=Object.keys(t).map(function(k){return t[k]}).sort(function(x,y){return y.g-x.g||y.s-x.s||y.b-x.b||cfg.PR.indexOf(x.id)-cfg.PR.indexOf(y.id)});
+    var rank=0;a.forEach(function(x,i){var p=a[i-1];if(!p||p.g!==x.g||p.s!==x.s||p.b!==x.b)rank=i+1;x.rank=rank});return a}
   var last="",prev={};
   function apply(res,label){
     var rows=calc(res),sig=JSON.stringify(rows.map(function(r){return[r.id,r.g,r.s,r.b,r.rank]}));
