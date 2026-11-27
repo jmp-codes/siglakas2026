@@ -343,7 +343,7 @@ function exportResults(){download("siglakas2026-event-results.csv",csv([["#","Ev
 
 // ---------- components ----------
 function heading(icon,title,withTools,which){
-  return `<div class="page-heading"><h2>${icon}${title}</h2>${withTools?`<div class="toolbar"><button class="tbtn" data-act="csv-${which}">${I.dl}Download CSV</button><button class="tbtn fill" data-act="print">${I.print}Print</button></div>`:""}</div>`;
+  return `<div class="page-heading"><h2>${icon}${title}</h2>${withTools?`<div class="toolbar"><button class="tbtn" data-act="csv-${which}">${I.dl}Download CSV</button><button class="tbtn fill" data-act="print">${I.print}Print report</button></div>`:""}</div>`;
 }
 function status(cat){
   const total=evs(cat).length,d=doneCount(cat);
@@ -564,6 +564,54 @@ h1{margin:0;font-style:italic;text-align:center;font-size:6.2rem;font-weight:900
 }
 function publicRows(){return tally("all").map(x=>({id:x.id,g:x.g,s:x.s,b:x.b,rank:x.rank}))}
 const nowStr=()=>new Date().toLocaleString("en-PH",{month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+
+// ---------- printable report ----------
+function reportHTML(){
+  const T=tally("all"),done=E.filter(isDone).length,tot=E.length,pct=Math.round(done/tot*1000)/10,final=done===tot;
+  const full=id=>PROGRAMS.find(p=>p.id===id).full;
+  const bar=["#c9973a","#9aa3b5","#b4714a"];
+  const rows=T.map((x,i)=>`<div class="row ${i%2?"alt":""}" style="--bar:${bar[Math.min(i,2)]}"><div class="rk">${x.rank}</div><img src="${SEAL[x.id]}" alt=""><div class="nm"><b>${x.id}</b><span>${full(x.id)}</span></div><div class="n g">${x.g}</div><div class="n s">${x.s}</div><div class="n b">${x.b}</div><div class="tt"><i>${x.g+x.s+x.b}</i></div></div>`).join("");
+  const ev=E.map((e,i)=>{const r=results[e.id]||{};const c=k=>r[k]?`<td class="c ${k}">${r[k]}</td>`:`<td class="c none">—</td>`;
+    return `<tr><td class="num">${i+1}</td><td class="en">${e.name}</td><td class="w">×${e.w}</td>${c("g")}${c("s")}${c("b")}</tr>`});
+  const half=Math.ceil(ev.length/2);
+  const tbl=a=>`<table><thead><tr><th>#</th><th class="l">Event</th><th>Value</th><th>Gold</th><th>Silver</th><th>Bronze</th></tr></thead><tbody>${a.join("")}</tbody></table>`;
+  const css=`@page{size:letter landscape;margin:0}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;font-family:'DejaVu Sans',Inter,'Segoe UI',Arial,sans-serif;color:#2a1c3d;background:#fff}
+.page{width:11in;height:8.5in;position:relative;overflow:hidden;page-break-after:always}.page:last-child{page-break-after:auto}
+.hd{background:#33174f;color:#fff;height:1.7in;padding:.38in .5in 0;border-bottom:.07in solid #d9a94b;position:relative}
+.hd .k{color:#ecc77a;font-weight:800;font-size:17px;letter-spacing:.02em}.hd h1{margin:.06in 0 .14in;font-size:38px;line-height:1.05}.hd .sub{font-size:11.5px;letter-spacing:.04em;color:#e8def2}
+.hd .pill{position:absolute;right:.5in;top:.45in;background:#573677;border-radius:999px;padding:.11in .3in;font-size:11.5px;font-weight:800;letter-spacing:.04em}
+.body{padding:.28in .5in 0}
+.prog{background:#f3f0f7;border-radius:12px;padding:.17in .25in;display:flex;justify-content:space-between;align-items:center;gap:.4in}.prog b{font-size:19px;display:block}.prog small{font-size:11px;color:#6c5d7c;display:block;margin-top:5px}
+.meter{width:3.5in;text-align:right}.meter strong{font-size:16px}.meter .bg{height:10px;border-radius:99px;background:#ddd4e8;margin-top:.08in;overflow:hidden}.meter .bg i{display:block;height:100%;background:#7a4fa3;border-radius:99px}
+.sec{display:flex;justify-content:space-between;margin:.24in 0 .08in;font-size:12px}.sec b{letter-spacing:.03em}.sec span{color:#6c5d7c}
+.th,.row{display:grid;grid-template-columns:.9in .7in 3.3in 1fr 1fr 1fr 1.35in;align-items:center}
+.th{background:#33174f;color:#fff;border-radius:10px;height:.42in;font-size:11.5px;font-weight:800;padding:0 .1in}.th div:nth-child(n+4){text-align:center}
+.row{height:.9in;margin-top:.04in;background:#f6f3f9;border-left:.06in solid var(--bar);padding:0 .1in}.row.alt{background:#fff}
+.rk{font-size:28px;font-weight:800;text-align:center;color:#33174f}.row img{height:.58in;width:.58in;object-fit:contain}
+.nm b{font-size:21px;display:block}.nm span{font-size:10.5px;color:#6c5d7c;display:block;margin-top:5px}
+.n{text-align:center;font-size:28px;font-weight:800}.n.g{color:#8a6414}.n.s{color:#4f5d73}.n.b{color:#a05a30}
+.tt{text-align:center}.tt i{display:inline-block;font-style:normal;background:#e9e0f3;border-radius:10px;min-width:1.0in;padding:.1in .12in;font-size:30px;font-weight:800;color:#33174f}
+.rules{display:grid;grid-template-columns:1fr 1fr;gap:.4in;background:#f3f0f7;border-radius:12px;padding:.2in .25in;margin-top:.22in}.rules h4{margin:0 0 .08in;font-size:13px}.rules p{margin:0;font-size:10.5px;line-height:1.55;color:#6c5d7c}
+.foot{position:absolute;left:.5in;right:.5in;bottom:.28in;display:flex;justify-content:space-between;font-size:9.5px;color:#6c5d7c}
+.p2 .hd{height:1.15in;padding-top:.26in}.p2 .hd h1{font-size:26px;margin:.04in 0}.p2 .hd .pill{top:.3in}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:.3in;padding:.22in .5in 0}
+table{width:100%;border-collapse:collapse;font-size:9.5px}th{background:#33174f;color:#fff;padding:5px 4px;font-size:9px}th.l{text-align:left}td{padding:4.2px 4px;border-bottom:1px solid #ece6f3}tr:nth-child(even) td{background:#f8f6fb}
+.num{color:#6c5d7c;text-align:center;width:.3in}.w{text-align:center;color:#6c5d7c}.c{text-align:center;font-weight:800}.c.none{color:#b9aec8;font-weight:400}.c.g{color:#8a6414}.c.s{color:#4f5d73}.c.b{color:#a05a30}.en{font-weight:600}`;
+  const nd=new Date(),dt=(nd.toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})+" • "+nd.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})).toUpperCase();
+  return `<!doctype html><html><head><meta charset="utf-8"><title>SIGLAKAS 2026 | Overall Medal Standings</title><style>${css}</style></head><body>
+<div class="page"><div class="hd"><div class="k">SIGLAKAS 2026</div><h1>Overall Medal Standings</h1><div class="sub">TABULATION REPORT / ${dt}</div><div class="pill">${final?"FINAL RESULTS":"PARTIAL RESULTS"}</div></div>
+<div class="body"><div class="prog"><div><b>${done} of ${tot} events finalized</b><small>Counts use posted results only.</small></div><div class="meter"><strong>${pct}% complete</strong><div class="bg"><i style="width:${pct}%"></i></div></div></div>
+<div class="sec"><b>PROGRAM RANKINGS</b><span>Weighted medal counts</span></div>
+<div class="th"><div style="text-align:center">RANK</div><div></div><div>PROGRAM</div><div>GOLD</div><div>SILVER</div><div>BRONZE</div><div>TOTAL</div></div>${rows}
+<div class="rules"><div><h4>Medal counting rule</h4><p>Individual sport: 1 medal value. Teams of 2–4 participants: 3 medal value (e.g., a gold in Sepak Takraw adds 3 golds). Teams of 5 or more: 5 medal value. Total = gold + silver + bronze.</p></div><div><h4>Ranking and tie-breaking rule</h4><p>Programs are ranked by the number of golds. Ties are broken by the higher silver count, then bronze.</p></div></div></div>
+<div class="foot"><span>Source: ${location.host||"SIGLAKAS 2026 tabulator"}</span><span>1 / 2</span></div></div>
+<div class="page p2"><div class="hd"><div class="k">SIGLAKAS 2026</div><h1>Event Results</h1><div class="sub">${done} OF ${tot} EVENTS FINALIZED / MEDAL VALUE PER EVENT SHOWN AS ×</div></div>
+<div class="cols">${tbl(ev.slice(0,half))}${tbl(ev.slice(half))}</div><div class="foot"><span>Source: ${location.host||"SIGLAKAS 2026 tabulator"}</span><span>2 / 2</span></div></div></body></html>`;
+}
+function printReport(){
+  const f=document.createElement("iframe");f.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0";document.body.appendChild(f);
+  f.srcdoc=reportHTML();f.onload=()=>{setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){}setTimeout(()=>f.remove(),60000)},300)};
+}
 function previewPublic(){
   const d=document.createElement("div");d.id="pv";d.style.cssText="position:fixed;inset:0;z-index:100;background:#0b0f3a;display:flex;flex-direction:column";
   d.innerHTML='<div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;color:#fff;font-weight:700">Public page preview (static snapshot)<button class="btn" id="pvx">Close</button></div><iframe style="flex:1;border:0;width:100%"></iframe>';
@@ -604,7 +652,7 @@ function wire(){
   const per=$("#per");if(per)per.onchange=()=>{ST.sper=+per.value;ST.spg=1;render()};
   on("#gtb",()=>{const n=parseInt($("#gt").value);if(n>0){ST.pg=n;render()}});
   document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{
-    const a=b.dataset.act;if(a==="print")window.print();
+    const a=b.dataset.act;if(a==="print")printReport();
     else if(a==="csv-standings")exportStandings();else if(a==="csv-results")exportResults();
     else if(a==="csv-sched"){const d=SCHEDULE[ST.sday];download("siglakas2026-schedule.csv",csv([["Day","Time","Activity","Venue"],...d[1].map(r=>[d[0],r[0],r[1].replace(/&amp;/g,"&"),r[4].replace(/&amp;/g,"&")])]))}
   });
